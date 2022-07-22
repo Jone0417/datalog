@@ -16,7 +16,7 @@ def limit(val):
         val = val
     return val
 
-def cal_rortation(new_date):
+def cal_rortation(new_date):        # calculate current rotation angle from J2000 frame
     ts = load.timescale()
     julian = ts.utc(new_date.year, new_date.month, new_date.day, new_date.hour, new_date.minute, new_date.second)
     reference_solar_jul = ts.utc(new_date.year, 1,1,0,0,0)
@@ -68,25 +68,25 @@ def quaternion_to_dcm(q): # Transform quaternion to DCM
                      [2*(q1*q3+q2*q4), 2*(q2*q3 - q1*q4), q4**2 - q1**2 - q2**2 + q3**2]])
     return dcm
 
-def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):
+def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):           # main function 
     start = time.time()
-    satellites = load.tle_file(stations_url, reload=True)
+    satellites = load.tle_file(stations_url, reload=True)                           # load tle data from stations_url(in network)
     print('Loaded', len(satellites), 'satellites')
     print('satellites', satellites)
 
-    target = input("satellite name: ")
+    target = input("satellite name: ")                                              # choose target satellite with its name in satellite lists
     if target not in {sat.name: sat for sat in satellites}:
         print("WRONG NAME")
     satellite = {sat.name: sat for sat in satellites}[target]
     print(satellite)
     
-    sat_DCM = quaternion_to_dcm(quaternion)
+    sat_DCM = quaternion_to_dcm(quaternion)                                         # convert input quaternion to rotation DCM
     basis = np.array([[100,0,0],
                       [0,100,0],
                       [0,0,100]])
-    sat_attitude = (sat_DCM @ basis).T
+    sat_attitude = (sat_DCM @ basis).T                                              # decide satellite attitude with DCM
     
-    earth = pv.Sphere(radius=earth_r, theta_resolution=360, phi_resolution=360, start_theta=270.001, end_theta=270)
+    earth = pv.Sphere(radius=earth_r, theta_resolution=360, phi_resolution=360, start_theta=270.001, end_theta=270)    # load 3D earth
     earth.active_t_coords = np.zeros((earth.points.shape[0], 2))
 
     for i in range(earth.points.shape[0]):
@@ -94,14 +94,15 @@ def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):
         x,y,z = limit(x), limit(y), limit(z)
         earth.active_t_coords[i] = [0.5 + math.atan2(-x, y)/(2 * math.pi), 0.5 + math.asin(z)/math.pi]
 
-    new_date = datetime.now()
+    new_date = datetime.now()                                                       # load current time 
     print('Current Time: ',new_date)
-    rot_angle = cal_rortation(new_date)
-    earth.rotate_z(-90 + rot_angle)
+    rot_angle = cal_rortation(new_date)                                             # calculate rotation angle at current time
+    earth.rotate_z(-90 + rot_angle)     
     ts = load.timescale()
-    tn = ts.now()
+    # tn = ts.now()
+    tn = ts.utc(new_date.year, new_date.month, new_date.day, new_date.hour, new_date.minute, new_date.second)
     geocentric = satellite.at(tn)
-    sat_location = geocentric.position.km
+    sat_location = geocentric.position.km                                           # current location of satellite in GCRS frame
        
     pl = pv.Plotter(window_size=(1600,1200))
     pl.add_background_image('starry-night-sky-fit.jpg', scale=1.001)
@@ -115,11 +116,11 @@ def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):
     gs_scale = 80
     colors = ['green', 'red' , 'blue', 'cyan', 'orange', 'pink', 'white','lightgreen']
       
-    # 위성의 궤도
-    steps =6000
+
+    steps =6000                             
     orbit = []
 
-    for i in range(steps):
+    for i in range(steps):                                                          # 6000 steps orbit of satellite start from now
         new_date = new_date + timedelta(seconds = 1)
         yr, mon, day = new_date.year, new_date.month, new_date.day
         hour, min, sec = new_date.hour, new_date.minute, new_date.second
@@ -141,12 +142,11 @@ def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):
         distance = math.sqrt((loc_j2k.x.value[i]- ground_station[0])**2 + (loc_j2k.y.value[i]- ground_station[1])**2 +(loc_j2k.z.value[i]- ground_station[2])**2)
         if distance <= 3000:
             pl.add_mesh(orbit_j2k[i], point_size=7, color= colors[-3])
-    # print("Current location[J2K]: ",loc_j2k.x.value, loc_j2k.y.value, loc_j2k.z.value)
 
     sat_j2k = SkyCoord(x= sat_location[0], y=sat_location[1], z= sat_location[2], frame = GCRS(), unit= 'kpc', representation_type= 'cartesian').transform_to(FK5(equinox = 'j2000'))
     sat_j2k.representation_type = 'cartesian'
     sat_location = np.array([sat_j2k.x.value, sat_j2k.y.value, sat_j2k.z.value])
-    print("Current location[J2K]: ",sat_location[0], sat_location[1], sat_location[2])
+    print("Current location[J2K]: ",sat_location[0], sat_location[1], sat_location[2])  # current location of satellite in J2K frame
     for i in range(gs_mesh.points.shape[0]):
         x_gs, y_gs, z_gs = gs_mesh.points[i,0]*gs_scale + ground_station[0], gs_mesh.points[i,1]*gs_scale + ground_station[1], gs_mesh.points[i,2]*gs_scale + ground_station[2] 
         gs_mesh.points[i,0], gs_mesh.points[i,1], gs_mesh.points[i,2] = x_gs, y_gs, z_gs
@@ -159,16 +159,16 @@ def visualize_sat_j2k(stations_url, ground_station, vectors, quaternion):
     pl.add_mesh(gs_mesh, color= colors[1])
     pl.add_mesh(dj, point_size= 10, color= colors[3], render_points_as_spheres= True)
     pl.add_mesh(sat_mesh, color= colors[-2])
-    # 위성의 자세
-    for i in range(3):
+    
+    for i in range(3):                                                                  # attitude of satellite
         pl.add_lines(np.array([sat_location + 3*sat_attitude[i], sat_location]), color = colors[i], width = 3)
-    # 임의의 벡터
-    for i in range(len(vectors)):
+    
+    for i in range(len(vectors)):                                                       # soeme vectors 
         loc = sat_DCM @ vectors[i]
         loc = loc / (math.sqrt(loc[0]**2 + loc[1]**2 + loc[2]**2)) * 200
         pl.add_lines(np.array([sat_location, sat_location + loc]), color= colors[i+3], width=4)
-    # 좌표계
-    for i in range(3):
+    
+    for i in range(3):                                                                  # orthonormal coordinates (x,y,z)
         pl.add_lines(np.array([[0,0,0], basis[i]/100*earth_r*1.2]), color = colors[i], width = 2)
     pl.add_axes(line_width= 5, labels_off=False)
     
@@ -196,7 +196,4 @@ q1, q2, q3, q4 = 0,(1/4)**(1/2),(1/4)**(1/2),(1/2)**(1/2)
 quaternion = np.array([q1, q2, q3, q4])
 
 ## main
-
-# rot_angle = cal_rortation(datetime.now())
-# print(-90 + rot_angle - lon)
 visualize_sat_j2k(stations_url, ground_station, vectors, quaternion)
