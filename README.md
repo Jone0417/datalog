@@ -11,3 +11,9 @@ sat_trajectory[ECEF].py
 
 sat_trajectory[ECEF] is simulation in ECEF i.e., earth centered and earth fixed frame. In this frame, orgin of coordinates is identical to center of the earth and z axis is identical with rotation axis of earth, x aixs is pointing to zero-lattitude line, and y axis follows orthonormal coordinates directions.
 Since earth is fixed in this simulation, satellite update its location with modifying its orbit with earth's rotation. So, if we run this simulation longer than 1 orbit, the result will be looks like 'referecen_figure_1~5'
+
+
+sat_trajectory[J2000].py
+
+sat_trajectory[J2000] is simulation in J2000 frame. J2K frame is ECI frame that earth centered but, inertial frame that orthonormal coordinates reflect earth's rotation. z axis is identical to rotation axis, x axis is pointing equinox of 2000, and y axis follows orthonormal coordinates directions.
+In this simulation, 'rot_angle' parameter reflect earth rotation angle after 2000 year. 
